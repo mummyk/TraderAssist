@@ -1,10 +1,10 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
 	import ThemeToggle from "../lib/components/ThemeToggle.svelte";
 	import PrimaryButton from "../lib/components/PrimaryButton.svelte";
 
 	function handleLoadApp() {
-		console.log("Loading main application...");
-		// Navigate to dashboard or main app view
+		goto("/dashboard");
 	}
 
 	function handleCloudConnect() {
@@ -61,7 +61,7 @@
 						<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
 						<polyline points="9 22 9 12 15 12 15 22" />
 					</svg>
-					Open Dashboard
+					Open Terminal
 				</PrimaryButton>
 				<PrimaryButton variant="secondary" disabled badge="Soon">
 					<svg
@@ -201,6 +201,7 @@
 </div>
 
 <style>
+	/* Same styles as before */
 	.app-window {
 		display: flex;
 		flex-direction: column;
@@ -208,7 +209,6 @@
 		background-color: var(--bg-primary);
 	}
 
-	/* Title Bar */
 	.titlebar {
 		display: flex;
 		justify-content: space-between;
@@ -238,7 +238,6 @@
 		color: var(--text-primary);
 	}
 
-	/* Main Content */
 	.content {
 		flex: 1;
 		overflow-y: auto;
@@ -272,7 +271,6 @@
 		justify-content: center;
 	}
 
-	/* Features Section */
 	.features-container {
 		max-width: 900px;
 		margin: 0 auto;
@@ -336,7 +334,6 @@
 		line-height: 1.4;
 	}
 
-	/* Status Bar */
 	.statusbar {
 		display: flex;
 		justify-content: space-between;
@@ -369,10 +366,9 @@
 	}
 
 	.status-indicator.ready {
-		background-color: #4caf50;
+		background-color: #22c55e;
 	}
 
-	/* Scrollbar Styling */
 	.content::-webkit-scrollbar {
 		width: 12px;
 	}
