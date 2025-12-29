@@ -4,6 +4,7 @@
 	import { modalStore } from "../../../stores/modalStore";
 	import IndicatorModal from "$lib/components/modals/IndicatorModal.svelte";
 	import ShapeModal from "$lib/components/modals/ShapeModal.svelte";
+	import NewChartModal from "$lib/components/modals/NewChartModal.svelte";
 
 	export let selectedSymbol = "EURUSD";
 	export let selectedTimeframe = "M15";
@@ -14,6 +15,10 @@
 
 	const symbols = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD"];
 	const timeframes = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"];
+
+	function openNewChartModal() {
+		modalStore.open("New Chart", NewChartModal, {});
+	}
 
 	function openIndicatorModal() {
 		modalStore.open("Add Indicator", IndicatorModal, {
@@ -36,7 +41,7 @@
 
 <div class="toolbar">
 	<div class="toolbar-section">
-		<ToolbarButton title="New Chart">
+		<ToolbarButton title="New Chart" onclick={openNewChartModal}>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="16"
