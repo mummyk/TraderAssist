@@ -1,9 +1,18 @@
-<script>
+<script lang="ts">
 	import "../app.css";
 	import ThemeToggle from "../lib/components/ThemeToggle.svelte";
-	import { page } from "$app/stores";
+	import Modal from "../lib/components/Modal.svelte";
 
-	$: isDashboard = $page.url.pathname.startsWith("/dashboard");
+	interface Props {
+		data: {
+			url: URL;
+		};
+		children: import("svelte").Snippet;
+	}
+
+	let { data, children }: Props = $props();
+
+	let isDashboard = $derived(data.url.pathname.startsWith("/dashboard"));
 </script>
 
 {#if isDashboard}
@@ -30,7 +39,7 @@
 		</header>
 
 		<div class="app-content">
-			<slot />
+			{@render children()}
 		</div>
 
 		<footer class="statusbar no-select">
@@ -47,8 +56,11 @@
 	</div>
 {:else}
 	<!-- Welcome Page (no titlebar) -->
-	<slot />
+	{@render children()}
 {/if}
+
+<!-- Global Modal -->
+<Modal />
 
 <style>
 	.app-window {
@@ -124,6 +136,6 @@
 	}
 
 	.status-indicator.ready {
-		background-color: #4caf50;
+		background-color: #22c55e;
 	}
 </style>

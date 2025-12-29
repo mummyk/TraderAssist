@@ -4,3 +4,9 @@
 // See: https://v2.tauri.app/start/frontend/sveltekit/ for more info
 export const ssr = false;
 export const prerender = true;
+
+export function load({ url }: { url: URL }) {
+	return {
+		url,
+	};
+}
