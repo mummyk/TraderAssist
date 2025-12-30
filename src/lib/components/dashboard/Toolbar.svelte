@@ -41,7 +41,7 @@
 
 <div class="toolbar">
 	<div class="toolbar-section">
-		<ToolbarButton title="New Chart" onclick={openNewChartModal}>
+		<ToolbarButton title="New Chart (ctrl/cmd + n)" onclick={openNewChartModal}>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="16"
