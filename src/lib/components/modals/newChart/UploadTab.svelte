@@ -2,6 +2,7 @@
 	import { invoke } from "@tauri-apps/api/core";
 	import { open } from "@tauri-apps/plugin-dialog";
 	import { modalStore } from "../../../../stores/modalStore";
+	import { symbolsStore } from "../../../../stores/symbolsStore";
 
 	interface ProcessResult {
 		success: boolean;
@@ -19,19 +20,29 @@
 	async function handleSelectFolder() {
 		error = null;
 		try {
+			// Explicitly set directory to true and multiple to false
 			const selected = await open({
 				directory: true,
 				multiple: false,
-				title: "Select Symbol Folder (e.g., EURUSD)",
+				title: "Select Symbol Folder (e.g., EURUSD containing CSV files)",
+				defaultPath: undefined,
 			});
 
-			if (selected && typeof selected === "string") {
-				selectedFolder = selected;
-				await processFolder(selected);
+			console.log("Selected:", selected); // Debug log
+
+			if (selected) {
+				// Handle both string and array responses
+				const folderPath =
+					typeof selected === "string" ? selected : selected[0];
+
+				if (folderPath) {
+					selectedFolder = folderPath;
+					await processFolder(folderPath);
+				}
 			}
 		} catch (err) {
 			console.error("Error selecting folder:", err);
-			error = "Failed to select folder";
+			error = "Failed to select folder: " + String(err);
 		}
 	}
 
@@ -47,6 +58,9 @@
 
 			console.log("Processing result:", result);
 			processingStatus = result.message;
+
+			// Refresh symbols list
+			await symbolsStore.refresh();
 
 			// Close modal after 2 seconds on success
 			setTimeout(() => {
@@ -73,19 +87,19 @@
 			stroke="currentColor"
 			stroke-width="1.5"
 		>
-			<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-			<polyline points="17 8 12 3 7 8" />
-			<line x1="12" y1="3" x2="12" y2="15" />
+			<path
+				d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+			/>
 		</svg>
-		<h4>Select Symbol Folder</h4>
-		<p>Choose a folder containing timeframe CSV files</p>
+		<h4>Upload Symbol Data</h4>
+		<p>Select a folder containing timeframe CSV files</p>
 
 		<button
 			class="upload-btn"
 			onclick={handleSelectFolder}
 			disabled={isProcessing}
 		>
-			{isProcessing ? "Processing..." : "Select Folder"}
+			{isProcessing ? "Processing..." : "📁 Select Folder"}
 		</button>
 
 		{#if selectedFolder}
@@ -109,21 +123,34 @@
 	</div>
 
 	<div class="folder-structure-info">
-		<h5>Expected Folder Structure:</h5>
+		<h5>Required Folder Structure:</h5>
 		<div class="structure-example">
 			<code>
-				EURUSD/<br />
-				├── M1.csv<br />
-				├── M5.csv<br />
-				├── M15.csv<br />
-				├── M30.csv<br />
-				├── H1.csv<br />
-				└── D1.csv
+				📁 EURUSD/ <span class="comment">← Select this folder</span><br />
+				&nbsp;&nbsp;├── M1.csv<br />
+				&nbsp;&nbsp;├── M5.csv<br />
+				&nbsp;&nbsp;├── M15.csv<br />
+				&nbsp;&nbsp;├── M30.csv<br />
+				&nbsp;&nbsp;├── H1.csv<br />
+				&nbsp;&nbsp;├── H4.csv<br />
+				&nbsp;&nbsp;├── D1.csv<br />
+				&nbsp;&nbsp;├── W1.csv<br />
+				&nbsp;&nbsp;└── MN1.csv
 			</code>
 		</div>
-		<p class="csv-format">
-			<strong>CSV Format:</strong> timestamp,open,high,low,close,volume
-		</p>
+		<div class="info-notes">
+			<p class="note">
+				<strong>Note:</strong> Select the parent folder (e.g., EURUSD) that contains
+				the CSV files
+			</p>
+			<p class="csv-format">
+				<strong>CSV Format:</strong> timestamp,open,high,low,close,volume
+			</p>
+			<p class="note">
+				<strong>Timeframes:</strong> M = minutes, H = hours, D = daily, W = weekly,
+				MN = monthly
+			</p>
+		</div>
 	</div>
 </div>
 
@@ -268,15 +295,33 @@
 		font-family: "Consolas", "Monaco", monospace;
 		font-size: 12px;
 		color: var(--text-primary);
-		line-height: 1.6;
+		line-height: 1.8;
+		display: block;
 	}
 
+	.comment {
+		color: var(--accent);
+		font-style: italic;
+	}
+
+	.info-notes {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.note,
 	.csv-format {
-		font-size: 12px;
+		font-size: 11px;
 		color: var(--text-secondary);
 		margin: 0;
+		padding: 6px 8px;
+		background-color: var(--bg-primary);
+		border-radius: 4px;
+		border-left: 2px solid var(--accent);
 	}
 
+	.note strong,
 	.csv-format strong {
 		color: var(--text-primary);
 	}

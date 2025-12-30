@@ -1,23 +1,56 @@
 <script lang="ts">
+	import { onMount } from "svelte";
+	import { symbolsStore, type SymbolData } from "../../../stores/symbolsStore";
+
 	interface MarketItem {
 		symbol: string;
 		bid: string;
 		ask: string;
+		timeframes: string[];
 	}
 
-	let activeTab: "market" | "navigator" = "market";
+	let activeTab = $state<"market" | "navigator">("market");
+	let symbols = $state<SymbolData[]>([]);
+	let marketData = $state<MarketItem[]>([]);
 
-	const marketData: MarketItem[] = [
-		{ symbol: "EURUSD", bid: "1.0845", ask: "1.0847" },
-		{ symbol: "GBPUSD", bid: "1.2634", ask: "1.2636" },
-		{ symbol: "USDJPY", bid: "149.82", ask: "149.85" },
-		{ symbol: "AUDUSD", bid: "0.6521", ask: "0.6523" },
-		{ symbol: "USDCAD", bid: "1.3654", ask: "1.3656" },
-		{ symbol: "NZDUSD", bid: "0.5987", ask: "0.5989" },
-	];
+	onMount(async () => {
+		await loadSymbols();
+	});
+
+	symbolsStore.subscribe((data) => {
+		symbols = data;
+		updateMarketData(data);
+	});
+
+	async function loadSymbols() {
+		await symbolsStore.loadSymbols();
+	}
+
+	function updateMarketData(symbolData: SymbolData[]) {
+		// Mock bid/ask prices - you can replace this with real data later
+		marketData = symbolData.map((symbol) => ({
+			symbol: symbol.symbol,
+			bid: generateMockPrice(),
+			ask: generateMockPrice(true),
+			timeframes: symbol.timeframes.map((tf) => tf.display_name),
+		}));
+	}
+
+	function generateMockPrice(isAsk: boolean = false): string {
+		const base = (1 + Math.random()).toFixed(4);
+		return isAsk ? (parseFloat(base) + 0.0002).toFixed(4) : base;
+	}
 
 	function selectSymbol(symbol: string) {
 		console.log("Selected symbol:", symbol);
+		// TODO: Dispatch event to load symbol data
+	}
+
+	function handleKeyDown(event: KeyboardEvent, symbol: string) {
+		if (event.key === "Enter" || event.key === " ") {
+			event.preventDefault();
+			selectSymbol(symbol);
+		}
 	}
 </script>
 
@@ -41,28 +74,43 @@
 
 	<div class="panel-content">
 		{#if activeTab === "market"}
-			{#each marketData as item}
-				<div class="market-item" onclick={() => selectSymbol(item.symbol)}>
-					<div class="symbol">{item.symbol}</div>
-					<div class="price bid">{item.bid}</div>
-					<div class="price ask">{item.ask}</div>
+			{#if marketData.length === 0}
+				<div class="empty-state">
+					<p>No symbols uploaded yet</p>
+					<p class="hint">Upload a symbol folder to get started</p>
 				</div>
-			{/each}
+			{:else}
+				{#each marketData as item}
+					<div
+						class="market-item"
+						role="button"
+						tabindex="0"
+						onclick={() => selectSymbol(item.symbol)}
+						onkeydown={(e) => handleKeyDown(e, item.symbol)}
+					>
+						<div class="symbol">{item.symbol}</div>
+						<div class="price bid">{item.bid}</div>
+						<div class="price ask">{item.ask}</div>
+						<div class="timeframes-count">{item.timeframes.length} TFs</div>
+					</div>
+				{/each}
+			{/if}
 		{:else}
 			<div class="navigator-content">
 				<div class="nav-section">
-					<div class="nav-header">Accounts</div>
-					<div class="nav-item">Demo Account</div>
-				</div>
-				<div class="nav-section">
-					<div class="nav-header">Indicators</div>
-					<div class="nav-item">Moving Average</div>
-					<div class="nav-item">RSI</div>
-					<div class="nav-item">MACD</div>
-				</div>
-				<div class="nav-section">
-					<div class="nav-header">Expert Advisors</div>
-					<div class="nav-item">My EA</div>
+					<div class="nav-header">Uploaded Symbols ({symbols.length})</div>
+					{#each symbols as symbol}
+						<div
+							class="nav-item"
+							role="button"
+							tabindex="0"
+							onclick={() => selectSymbol(symbol.symbol)}
+							onkeydown={(e) => handleKeyDown(e, symbol.symbol)}
+						>
+							{symbol.symbol}
+							<span class="badge">{symbol.timeframes.length}</span>
+						</div>
+					{/each}
 				</div>
 			</div>
 		{/if}
@@ -111,6 +159,28 @@
 		padding: 4px;
 	}
 
+	.empty-state {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		height: 100%;
+		padding: 24px;
+		text-align: center;
+	}
+
+	.empty-state p {
+		margin: 0;
+		font-size: 12px;
+		color: var(--text-secondary);
+	}
+
+	.empty-state .hint {
+		margin-top: 8px;
+		font-size: 11px;
+		color: var(--text-tertiary);
+	}
+
 	.market-item {
 		display: grid;
 		grid-template-columns: 1fr auto auto;
@@ -120,9 +190,11 @@
 		border-bottom: 1px solid var(--border-color);
 		cursor: pointer;
 		transition: background-color 0.15s;
+		outline: none;
 	}
 
-	.market-item:hover {
+	.market-item:hover,
+	.market-item:focus {
 		background-color: var(--border-color);
 	}
 
@@ -142,6 +214,12 @@
 
 	.price.ask {
 		color: #22c55e;
+	}
+
+	.timeframes-count {
+		grid-column: 1 / -1;
+		font-size: 10px;
+		color: var(--text-tertiary);
 	}
 
 	.navigator-content {
@@ -169,11 +247,25 @@
 		cursor: pointer;
 		border-radius: 3px;
 		transition: background-color 0.15s;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		outline: none;
 	}
 
-	.nav-item:hover {
+	.nav-item:hover,
+	.nav-item:focus {
 		background-color: var(--border-color);
 		color: var(--text-primary);
+	}
+
+	.badge {
+		background-color: var(--accent);
+		color: white;
+		padding: 2px 6px;
+		border-radius: 10px;
+		font-size: 10px;
+		font-weight: 600;
 	}
 
 	.panel-content::-webkit-scrollbar {
