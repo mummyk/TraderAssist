@@ -227,8 +227,12 @@ pub async fn get_symbol_data(app_handle: AppHandle, symbol: String) -> Result<Sy
     Ok(symbol_data)
 }
 
+fn is_valid_date_format(s: &str) -> bool {
+    // Check if it matches YYYY.MM.DD or YYYY.MM.DD HH:MM:SS format
+    s.contains('.') && (s.len() >= 10)
+}
+
 fn count_and_validate_csv(file_path: &PathBuf) -> Result<usize, String> {
-    // Try to detect the delimiter by reading the first few lines
     let content =
         fs::read_to_string(file_path).map_err(|e| format!("Failed to read file: {}", e))?;
 
@@ -236,30 +240,48 @@ fn count_and_validate_csv(file_path: &PathBuf) -> Result<usize, String> {
         return Err("File is empty".to_string());
     }
 
-    // Detect delimiter - try comma first, then semicolon, then tab
-    let delimiter = if content.contains(',') {
-        b','
-    } else if content.contains(';') {
-        b';'
-    } else if content.contains('\t') {
+    // Detect delimiter - check for tabs first (most common in your data), then comma, then semicolon
+    let first_line = content.lines().next().unwrap_or("");
+    let delimiter = if first_line.matches('\t').count() >= 4 {
         b'\t'
+    } else if first_line.matches(',').count() >= 4 {
+        b','
+    } else if first_line.matches(';').count() >= 4 {
+        b';'
+    } else if first_line.matches(' ').count() >= 7 {
+        // Multiple spaces might be used as delimiter
+        b' '
     } else {
         return Err(
-            "Could not detect CSV delimiter (expected comma, semicolon, or tab)".to_string(),
+            "Could not detect CSV delimiter (expected tab, comma, or semicolon)".to_string(),
         );
     };
 
     let mut rdr = ReaderBuilder::new()
         .has_headers(true)
         .delimiter(delimiter)
-        .flexible(true) // Allow variable number of columns
-        .trim(csv::Trim::All) // Trim whitespace
+        .flexible(true)
+        .trim(csv::Trim::All)
         .from_path(file_path)
         .map_err(|e| format!("Failed to read CSV: {}", e))?;
 
-    let mut count = 0;
-    let mut first_row_columns = 0;
+    // FIX: Clone the headers to release the mutable borrow on 'rdr'
+    let headers = rdr
+        .headers()
+        .map_err(|e| format!("Failed to read headers: {}", e))?
+        .clone();
 
+    if headers.len() < 5 {
+        return Err(format!(
+            "Invalid CSV format: Expected at least 5 columns, found {} columns in header. Your columns: {}",
+            headers.len(),
+            headers.iter().collect::<Vec<_>>().join(", ")
+        ));
+    }
+
+    let mut count = 0;
+
+    // Now 'rdr' is free to be borrowed again here
     for (index, result) in rdr.records().enumerate() {
         let record = result.map_err(|e| format!("Row {}: {}", index + 2, e))?;
 
@@ -268,44 +290,55 @@ fn count_and_validate_csv(file_path: &PathBuf) -> Result<usize, String> {
             continue;
         }
 
-        // Check column count on first valid row
+        if record.len() < 5 {
+            return Err(format!(
+                "Row {}: Expected at least 5 columns, found {}",
+                index + 2,
+                record.len()
+            ));
+        }
+
+        // Validate first data row
         if count == 0 {
-            first_row_columns = record.len();
+            // Column 0: Check if it's a date string or timestamp
+            let first_col = record.get(0).ok_or("Missing first column")?;
 
-            if first_row_columns < 5 {
-                return Err(format!(
-                    "Invalid format: Expected at least 5 columns (timestamp,open,high,low,close), found {}. Check your CSV delimiter (should be comma, semicolon, or tab)",
-                    first_row_columns
-                ));
+            // Accept either date format (YYYY.MM.DD) or Unix timestamp
+            if !is_valid_date_format(first_col) {
+                // Try parsing as number
+                first_col.parse::<i64>().map_err(|_| {
+                    format!(
+                        "Row {}: Invalid date/timestamp '{}'. Expected format: YYYY.MM.DD or Unix timestamp",
+                        index + 2,
+                        first_col
+                    )
+                })?;
             }
 
-            // Validate first row format
-            record
-                .get(0)
-                .ok_or("Missing timestamp column")?
-                .parse::<i64>()
-                .map_err(|_| format!("Row {}: Timestamp must be a number", index + 2))?;
+            // Columns 1-4 (or appropriate OHLC columns): Validate prices
+            let price_cols = if headers.len() >= 8 {
+                // Format: DATE, TIME, OPEN, HIGH, LOW, CLOSE, TICKVOL, VOL, SPREAD
+                // So OPEN is at index 2
+                2..=5
+            } else {
+                // Format: DATE, OPEN, HIGH, LOW, CLOSE
+                1..=4
+            };
 
-            for col in 1..=4 {
-                record
-                    .get(col)
-                    .ok_or(format!("Missing column {}", col + 1))?
-                    .parse::<f64>()
-                    .map_err(|_| {
-                        format!("Row {}: Column {} must be a number", index + 2, col + 1)
+            for col in price_cols {
+                if col < record.len() {
+                    let value_str = record
+                        .get(col)
+                        .ok_or(format!("Missing column {}", col + 1))?;
+                    value_str.parse::<f64>().map_err(|_| {
+                        format!(
+                            "Row {}: Invalid price '{}' in column {}",
+                            index + 2,
+                            value_str,
+                            col + 1
+                        )
                     })?;
-            }
-        } else {
-            // Check that subsequent rows have consistent column count
-            if record.len() != first_row_columns && record.len() >= 5 {
-                // Allow if it has at least 5 columns
-            } else if record.len() < 5 {
-                return Err(format!(
-                    "Row {}: Expected {} columns, found {}",
-                    index + 2,
-                    first_row_columns,
-                    record.len()
-                ));
+                }
             }
         }
 
