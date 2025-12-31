@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { onMount } from "svelte";
+	import { invoke } from "@tauri-apps/api/core";
 	import { symbolsStore, type SymbolData } from "../../../stores/symbolsStore";
 	import { chartStore } from "../../../stores/chartStore";
+	import { ask } from "@tauri-apps/plugin-dialog";
 
 	interface MarketItem {
 		symbol: string;
@@ -13,9 +15,24 @@
 	let activeTab = $state<"market" | "navigator">("market");
 	let symbols = $state<SymbolData[]>([]);
 	let marketData = $state<MarketItem[]>([]);
+	let contextMenu = $state<{
+		visible: boolean;
+		x: number;
+		y: number;
+		symbol: string;
+	}>({ visible: false, x: 0, y: 0, symbol: "" });
+	let renameModal = $state<{
+		visible: boolean;
+		symbol: string;
+		newName: string;
+	}>({ visible: false, symbol: "", newName: "" });
 
-	onMount(async () => {
-		await loadSymbols();
+	onMount(() => {
+		loadSymbols();
+		document.addEventListener("click", closeContextMenu);
+		return () => {
+			document.removeEventListener("click", closeContextMenu);
+		};
 	});
 
 	symbolsStore.subscribe((data) => {
@@ -75,6 +92,98 @@
 			selectSymbol(symbol);
 		}
 	}
+
+	function handleContextMenu(event: MouseEvent, symbol: string) {
+		event.preventDefault();
+		contextMenu = {
+			visible: true,
+			x: event.clientX,
+			y: event.clientY,
+			symbol,
+		};
+	}
+
+	function closeContextMenu() {
+		contextMenu = { ...contextMenu, visible: false };
+	}
+
+	function openRenameModal() {
+		renameModal = {
+			visible: true,
+			symbol: contextMenu.symbol,
+			newName: contextMenu.symbol,
+		};
+		closeContextMenu();
+	}
+
+	async function handleDelete() {
+		const symbolToDelete = contextMenu.symbol;
+		// closeContextMenu();
+
+		// Create a Yes/No dialog
+		const answer = await ask(
+			`Are you sure you want to delete "${symbolToDelete}"?`,
+			{
+				title: "Delete Symbol",
+				kind: "warning",
+			}
+		);
+
+		console.log(answer);
+
+		if (!answer) {
+			return;
+		}
+
+		try {
+			await invoke("delete_symbol", { symbol: symbolToDelete });
+			await symbolsStore.refresh();
+
+			// If deleted symbol was selected, reset selection
+			if (selectedSymbol === symbolToDelete) {
+				chartStore.reset();
+			}
+		} catch (error) {
+			alert(`Failed to delete symbol: ${error}`);
+		}
+	}
+
+	async function handleRename() {
+		if (!renameModal.newName || renameModal.newName === renameModal.symbol) {
+			renameModal = { visible: false, symbol: "", newName: "" };
+			return;
+		}
+
+		try {
+			await invoke("rename_symbol", {
+				oldSymbol: renameModal.symbol,
+				newSymbol: renameModal.newName,
+			});
+
+			await symbolsStore.refresh();
+
+			// Update selection if renamed symbol was selected
+			if (selectedSymbol === renameModal.symbol) {
+				const newSymbolData = symbols.find(
+					(s) => s.symbol === renameModal.newName.toUpperCase()
+				);
+				if (newSymbolData) {
+					selectSymbol(
+						newSymbolData.symbol,
+						newSymbolData.timeframes.map((tf) => tf.name)
+					);
+				}
+			}
+
+			renameModal = { visible: false, symbol: "", newName: "" };
+		} catch (error) {
+			alert(`Failed to rename symbol: ${error}`);
+		}
+	}
+
+	function cancelRename() {
+		renameModal = { visible: false, symbol: "", newName: "" };
+	}
 </script>
 
 <aside class="market-watch">
@@ -111,6 +220,7 @@
 						tabindex="0"
 						onclick={() => selectSymbol(item.symbol, item.timeframes)}
 						onkeydown={(e) => handleKeyDown(e, item.symbol)}
+						oncontextmenu={(e) => handleContextMenu(e, item.symbol)}
 					>
 						<div class="symbol">{item.symbol}</div>
 						<div class="price bid">{item.bid}</div>
@@ -131,6 +241,7 @@
 							tabindex="0"
 							onclick={() => selectSymbol(symbol.symbol)}
 							onkeydown={(e) => handleKeyDown(e, symbol.symbol)}
+							oncontextmenu={(e) => handleContextMenu(e, symbol.symbol)}
 						>
 							{symbol.symbol}
 							<span class="badge">{symbol.timeframes.length}</span>
@@ -141,6 +252,67 @@
 		{/if}
 	</div>
 </aside>
+
+{#if contextMenu.visible}
+	<div
+		class="context-menu"
+		style="top: {contextMenu.y}px; left: {contextMenu.x}px;"
+	>
+		<button class="context-menu-item" onclick={openRenameModal}>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
+				<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+			</svg>
+			Rename
+		</button>
+		<button class="context-menu-item delete" onclick={handleDelete}>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
+				<path d="M3 6h18" />
+				<path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+				<path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+			</svg>
+			Delete
+		</button>
+	</div>
+{/if}
+
+{#if renameModal.visible}
+	<div class="modal-overlay">
+		<div class="modal-content">
+			<h3>Rename Symbol</h3>
+			<p class="rename-hint">Renaming "{renameModal.symbol}"</p>
+			<input
+				type="text"
+				class="rename-input"
+				bind:value={renameModal.newName}
+				placeholder="Enter new symbol name"
+				onkeydown={(e) => {
+					if (e.key === "Enter") handleRename();
+					if (e.key === "Escape") cancelRename();
+				}}
+			/>
+			<div class="modal-actions">
+				<button class="btn-secondary" onclick={cancelRename}>Cancel</button>
+				<button class="btn-primary" onclick={handleRename}>Rename</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	.market-watch {
@@ -311,6 +483,130 @@
 	.nav-item.selected .badge {
 		background-color: white;
 		color: var(--accent);
+	}
+
+	.context-menu {
+		position: fixed;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 6px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+		padding: 4px;
+		z-index: 1000;
+		min-width: 140px;
+	}
+
+	.context-menu-item {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding: 8px 12px;
+		background: transparent;
+		border: none;
+		color: var(--text-primary);
+		font-size: 12px;
+		cursor: pointer;
+		border-radius: 4px;
+		transition: background-color 0.15s;
+		text-align: left;
+	}
+
+	.context-menu-item:hover {
+		background-color: var(--border-color);
+	}
+
+	.context-menu-item.delete {
+		color: #ef4444;
+	}
+
+	.context-menu-item.delete:hover {
+		background-color: rgba(239, 68, 68, 0.1);
+	}
+
+	.modal-overlay {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background-color: rgba(0, 0, 0, 0.5);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 2000;
+	}
+
+	.modal-content {
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		padding: 24px;
+		min-width: 320px;
+		max-width: 400px;
+	}
+
+	.modal-content h3 {
+		margin: 0 0 8px 0;
+		font-size: 16px;
+		color: var(--text-primary);
+	}
+
+	.rename-hint {
+		font-size: 12px;
+		color: var(--text-secondary);
+		margin: 0 0 16px 0;
+	}
+
+	.rename-input {
+		width: 100%;
+		padding: 8px 12px;
+		background-color: var(--surface-color);
+		border: 1px solid var(--border-color);
+		border-radius: 4px;
+		color: var(--text-primary);
+		font-size: 13px;
+		margin-bottom: 16px;
+	}
+
+	.rename-input:focus {
+		outline: none;
+		border-color: var(--accent);
+	}
+
+	.modal-actions {
+		display: flex;
+		gap: 8px;
+		justify-content: flex-end;
+	}
+
+	.btn-secondary,
+	.btn-primary {
+		padding: 8px 16px;
+		border: none;
+		border-radius: 4px;
+		font-size: 12px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.15s;
+	}
+
+	.btn-secondary {
+		background-color: var(--border-color);
+		color: var(--text-primary);
+	}
+
+	.btn-secondary:hover {
+		background-color: var(--surface-color);
+	}
+
+	.btn-primary {
+		background-color: var(--accent);
+		color: white;
+	}
+
+	.btn-primary:hover {
+		opacity: 0.9;
 	}
 
 	.panel-content::-webkit-scrollbar {

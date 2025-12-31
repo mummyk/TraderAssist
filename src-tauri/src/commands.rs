@@ -30,6 +30,21 @@ pub struct ProcessResult {
     pub total_candles: usize,
 }
 
+#[derive(Debug, Serialize)]
+pub struct DeleteResult {
+    pub success: bool,
+    pub message: String,
+    pub symbol: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RenameResult {
+    pub success: bool,
+    pub message: String,
+    pub old_symbol: String,
+    pub new_symbol: String,
+}
+
 #[tauri::command]
 pub async fn process_chart_folder(
     app_handle: AppHandle,
@@ -129,6 +144,93 @@ pub async fn process_chart_folder(
         symbol: Some(symbol_name),
         timeframes_processed,
         total_candles,
+    })
+}
+
+#[tauri::command]
+pub async fn delete_symbol(app_handle: AppHandle, symbol: String) -> Result<DeleteResult, String> {
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+
+    let json_path = app_dir.join("symbols").join(format!("{}.json", symbol));
+
+    if !json_path.exists() {
+        return Err(format!("Symbol '{}' not found", symbol));
+    }
+
+    // Delete the JSON file
+    fs::remove_file(&json_path).map_err(|e| format!("Failed to delete symbol file: {}", e))?;
+
+    Ok(DeleteResult {
+        success: true,
+        message: format!("Symbol '{}' deleted successfully", symbol),
+        symbol: symbol.clone(),
+    })
+}
+
+#[tauri::command]
+pub async fn rename_symbol(
+    app_handle: AppHandle,
+    old_symbol: String,
+    new_symbol: String,
+) -> Result<RenameResult, String> {
+    let new_symbol_upper = new_symbol.to_uppercase();
+
+    // Validate new symbol name
+    if new_symbol_upper.is_empty() {
+        return Err("New symbol name cannot be empty".to_string());
+    }
+
+    if new_symbol_upper.contains(|c: char| !c.is_alphanumeric() && c != '_') {
+        return Err("Symbol name can only contain letters, numbers, and underscores".to_string());
+    }
+
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+
+    let symbols_dir = app_dir.join("symbols");
+    let old_json_path = symbols_dir.join(format!("{}.json", old_symbol));
+    let new_json_path = symbols_dir.join(format!("{}.json", new_symbol_upper));
+
+    // Check if old symbol exists
+    if !old_json_path.exists() {
+        return Err(format!("Symbol '{}' not found", old_symbol));
+    }
+
+    // Check if new symbol name already exists
+    if new_json_path.exists() {
+        return Err(format!("Symbol '{}' already exists", new_symbol_upper));
+    }
+
+    // Read the existing symbol data
+    let content = fs::read_to_string(&old_json_path)
+        .map_err(|e| format!("Failed to read symbol file: {}", e))?;
+
+    let mut symbol_data: SymbolData = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse symbol data: {}", e))?;
+
+    // Update the symbol name
+    symbol_data.symbol = new_symbol_upper.clone();
+
+    // Save with new name
+    save_symbol_data(&app_handle, &symbol_data)?;
+
+    // Delete old file
+    fs::remove_file(&old_json_path)
+        .map_err(|e| format!("Failed to delete old symbol file: {}", e))?;
+
+    Ok(RenameResult {
+        success: true,
+        message: format!(
+            "Symbol renamed from '{}' to '{}'",
+            old_symbol, new_symbol_upper
+        ),
+        old_symbol,
+        new_symbol: new_symbol_upper,
     })
 }
 

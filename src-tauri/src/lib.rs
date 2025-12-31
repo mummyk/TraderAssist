@@ -13,6 +13,8 @@ pub fn run() {
             commands::process_chart_folder,
             commands::get_available_symbols,
             commands::get_symbol_data,
+            commands::delete_symbol,
+            commands::rename_symbol,
             greet,
         ])
         .run(tauri::generate_context!())
