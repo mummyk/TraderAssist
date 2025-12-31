@@ -18,6 +18,10 @@
     "fs:allow-read-text-file",
     "fs:allow-read-dir",
     "fs:allow-exists",
-    "fs:allow-read"
+    "fs:allow-read",
+    "sql:allow-execute",
+    "sql:allow-select",
+    "sql:allow-load",
+    "sql:allow-close"
   ]
 }

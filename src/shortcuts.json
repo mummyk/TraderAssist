@@ -1,0 +1,93 @@
+{
+   "shortcuts": [
+      {
+         "id": "new_chart",
+         "name": "New Chart",
+         "keys": [
+            "ctrl+n",
+            "cmd+n"
+         ],
+         "description": "Open new chart modal",
+         "action": "openNewChart"
+      },
+      {
+         "id": "open",
+         "name": "Open",
+         "keys": [
+            "ctrl+o",
+            "cmd+o"
+         ],
+         "description": "Open existing chart",
+         "action": "openChart"
+      },
+      {
+         "id": "save",
+         "name": "Save",
+         "keys": [
+            "ctrl+s",
+            "cmd+s"
+         ],
+         "description": "Save current chart",
+         "action": "saveChart"
+      },
+      {
+         "id": "settings",
+         "name": "Settings",
+         "keys": [
+            "ctrl+,",
+            "cmd+,"
+         ],
+         "description": "Open settings",
+         "action": "openSettings"
+      },
+      {
+         "id": "add_indicator",
+         "name": "Add Indicator",
+         "keys": [
+            "ctrl+i",
+            "cmd+i"
+         ],
+         "description": "Open indicator modal",
+         "action": "openIndicator"
+      },
+      {
+         "id": "add_shape",
+         "name": "Add Shape",
+         "keys": [
+            "ctrl+shift+s",
+            "cmd+shift+s"
+         ],
+         "description": "Open shape modal",
+         "action": "openShape"
+      },
+      {
+         "id": "zoom_in",
+         "name": "Zoom In",
+         "keys": [
+            "ctrl+=",
+            "cmd+="
+         ],
+         "description": "Zoom in on chart",
+         "action": "zoomIn"
+      },
+      {
+         "id": "zoom_out",
+         "name": "Zoom Out",
+         "keys": [
+            "ctrl+-",
+            "cmd+-"
+         ],
+         "description": "Zoom out on chart",
+         "action": "zoomOut"
+      },
+      {
+         "id": "play_pause",
+         "name": "Play/Pause",
+         "keys": [
+            "space"
+         ],
+         "description": "Toggle playback",
+         "action": "togglePlayback"
+      }
+   ]
+}
