@@ -94,7 +94,10 @@ pub async fn process_chart_folder(
     }
 
     timeframes.sort_by(|a, b| {
-        let order = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1", "MN1"];
+        let order = [
+            "M1", "M2", "M3", "M4", "M5", "M10", "M15", "M30", "H1", "H2", "H3", "H4", "D1", "W1",
+            "MN1",
+        ];
         let a_idx = order.iter().position(|&x| x == a.name).unwrap_or(999);
         let b_idx = order.iter().position(|&x| x == b.name).unwrap_or(999);
         a_idx.cmp(&b_idx)
@@ -132,10 +135,16 @@ pub async fn process_chart_folder(
 fn convert_timeframe_to_display(timeframe: &str) -> String {
     match timeframe {
         "M1" => "1 min".to_string(),
+        "M2" => "2 min".to_string(),
+        "M3" => "3 min".to_string(),
+        "M4" => "4 min".to_string(),
         "M5" => "5 min".to_string(),
+        "M10" => "10 min".to_string(),
         "M15" => "15 min".to_string(),
         "M30" => "30 min".to_string(),
         "H1" => "1 hour".to_string(),
+        "H2" => "2 hour".to_string(),
+        "H3" => "3 hour".to_string(),
         "H4" => "4 hours".to_string(),
         "D1" => "1 day".to_string(),
         "W1" => "1 week".to_string(),

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import { symbolsStore, type SymbolData } from "../../../stores/symbolsStore";
+	import { chartStore } from "../../../stores/chartStore";
 
 	interface MarketItem {
 		symbol: string;
@@ -20,6 +21,21 @@
 	symbolsStore.subscribe((data) => {
 		symbols = data;
 		updateMarketData(data);
+
+		// Auto-select first symbol if none is selected
+		if (data.length > 0 && !$chartStore.selectedSymbol) {
+			const firstSymbol = data[0];
+			selectSymbol(
+				firstSymbol.symbol,
+				firstSymbol.timeframes.map((tf) => tf.name)
+			);
+		}
+	});
+
+	// Subscribe to chart store to highlight selected symbol
+	let selectedSymbol = $state<string | null>(null);
+	chartStore.subscribe((state) => {
+		selectedSymbol = state.selectedSymbol;
 	});
 
 	async function loadSymbols() {
@@ -27,12 +43,11 @@
 	}
 
 	function updateMarketData(symbolData: SymbolData[]) {
-		// Mock bid/ask prices - you can replace this with real data later
 		marketData = symbolData.map((symbol) => ({
 			symbol: symbol.symbol,
 			bid: generateMockPrice(),
 			ask: generateMockPrice(true),
-			timeframes: symbol.timeframes.map((tf) => tf.display_name),
+			timeframes: symbol.timeframes.map((tf) => tf.name),
 		}));
 	}
 
@@ -41,9 +56,17 @@
 		return isAsk ? (parseFloat(base) + 0.0002).toFixed(4) : base;
 	}
 
-	function selectSymbol(symbol: string) {
+	function selectSymbol(symbol: string, timeframes?: string[]) {
 		console.log("Selected symbol:", symbol);
-		// TODO: Dispatch event to load symbol data
+
+		// Find the symbol data
+		const symbolData = symbols.find((s) => s.symbol === symbol);
+		if (symbolData) {
+			const tfNames = symbolData.timeframes.map((tf) => tf.name);
+			chartStore.setSymbol(symbol, tfNames);
+		} else if (timeframes) {
+			chartStore.setSymbol(symbol, timeframes);
+		}
 	}
 
 	function handleKeyDown(event: KeyboardEvent, symbol: string) {
@@ -83,9 +106,10 @@
 				{#each marketData as item}
 					<div
 						class="market-item"
+						class:selected={item.symbol === selectedSymbol}
 						role="button"
 						tabindex="0"
-						onclick={() => selectSymbol(item.symbol)}
+						onclick={() => selectSymbol(item.symbol, item.timeframes)}
 						onkeydown={(e) => handleKeyDown(e, item.symbol)}
 					>
 						<div class="symbol">{item.symbol}</div>
@@ -102,6 +126,7 @@
 					{#each symbols as symbol}
 						<div
 							class="nav-item"
+							class:selected={symbol.symbol === selectedSymbol}
 							role="button"
 							tabindex="0"
 							onclick={() => selectSymbol(symbol.symbol)}
@@ -198,6 +223,16 @@
 		background-color: var(--border-color);
 	}
 
+	.market-item.selected {
+		background-color: var(--accent);
+		color: white;
+	}
+
+	.market-item.selected .symbol,
+	.market-item.selected .price {
+		color: white;
+	}
+
 	.symbol {
 		font-weight: 600;
 		color: var(--text-primary);
@@ -259,6 +294,11 @@
 		color: var(--text-primary);
 	}
 
+	.nav-item.selected {
+		background-color: var(--accent);
+		color: white;
+	}
+
 	.badge {
 		background-color: var(--accent);
 		color: white;
@@ -266,6 +306,11 @@
 		border-radius: 10px;
 		font-size: 10px;
 		font-weight: 600;
+	}
+
+	.nav-item.selected .badge {
+		background-color: white;
+		color: var(--accent);
 	}
 
 	.panel-content::-webkit-scrollbar {

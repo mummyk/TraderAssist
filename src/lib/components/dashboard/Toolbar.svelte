@@ -2,19 +2,47 @@
 	import ToolbarButton from "./ToolbarButton.svelte";
 	import PlaybackControls from "./PlaybackControls.svelte";
 	import { modalStore } from "../../../stores/modalStore";
+	import { symbolsStore, type SymbolData } from "../../../stores/symbolsStore";
+	import { chartStore } from "../../../stores/chartStore";
 	import IndicatorModal from "$lib/components/modals/IndicatorModal.svelte";
 	import ShapeModal from "$lib/components/modals/ShapeModal.svelte";
 	import NewChartModal from "$lib/components/modals/NewChartModal.svelte";
+	import { onMount } from "svelte";
 
-	export let selectedSymbol = "EURUSD";
-	export let selectedTimeframe = "M15";
-	export let chartType = "candlesticks";
-	export let isPlaying = false;
-	export let isPaused = false;
-	export let playbackSpeed = 1;
+	interface ToolbarProps {
+		chartType?: string;
+		isPlaying?: boolean;
+		isPaused?: boolean;
+		playbackSpeed?: number;
+	}
 
-	const symbols = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD"];
-	const timeframes = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"];
+	let {
+		chartType = $bindable("candlesticks"),
+		isPlaying = $bindable(false),
+		isPaused = $bindable(false),
+		playbackSpeed = $bindable(1),
+	}: ToolbarProps = $props();
+
+	let availableSymbols = $state<SymbolData[]>([]);
+	let selectedSymbol = $state<string | null>(null);
+	let selectedTimeframe = $state<string | null>(null);
+	let availableTimeframes = $state<string[]>([]);
+
+	onMount(() => {
+		symbolsStore.loadSymbols();
+	});
+
+	// Subscribe to symbols store
+	symbolsStore.subscribe((symbols) => {
+		availableSymbols = symbols;
+	});
+
+	// Subscribe to chart store
+	chartStore.subscribe((state) => {
+		selectedSymbol = state.selectedSymbol;
+		selectedTimeframe = state.selectedTimeframe;
+		availableTimeframes = state.availableTimeframes;
+	});
 
 	function openNewChartModal() {
 		modalStore.open("New Chart", NewChartModal, {});
@@ -36,6 +64,22 @@
 				modalStore.close();
 			},
 		});
+	}
+
+	function handleSymbolChange(event: Event) {
+		const target = event.target as HTMLSelectElement;
+		const symbol = target.value;
+
+		const symbolData = availableSymbols.find((s) => s.symbol === symbol);
+		if (symbolData) {
+			const timeframes = symbolData.timeframes.map((tf) => tf.name);
+			chartStore.setSymbol(symbol, timeframes);
+		}
+	}
+
+	function handleTimeframeChange(event: Event) {
+		const target = event.target as HTMLSelectElement;
+		chartStore.setTimeframe(target.value);
 	}
 </script>
 
@@ -207,16 +251,45 @@
 	<div class="toolbar-separator"></div>
 
 	<div class="toolbar-section">
-		<select class="toolbar-select" bind:value={selectedSymbol}>
-			{#each symbols as symbol}
-				<option value={symbol}>{symbol}</option>
-			{/each}
-		</select>
-		<select class="toolbar-select" bind:value={selectedTimeframe}>
-			{#each timeframes as tf}
-				<option value={tf}>{tf}</option>
-			{/each}
-		</select>
+		{#if availableSymbols.length > 0}
+			<select
+				class="toolbar-select"
+				value={selectedSymbol || ""}
+				onchange={handleSymbolChange}
+				disabled={availableSymbols.length === 0}
+			>
+				{#if !selectedSymbol}
+					<option value="" disabled>Select Symbol</option>
+				{/if}
+				{#each availableSymbols as symbol}
+					<option value={symbol.symbol}>{symbol.symbol}</option>
+				{/each}
+			</select>
+		{:else}
+			<select class="toolbar-select" disabled>
+				<option>No Symbols</option>
+			</select>
+		{/if}
+
+		{#if availableTimeframes.length > 0}
+			<select
+				class="toolbar-select"
+				value={selectedTimeframe || ""}
+				onchange={handleTimeframeChange}
+				disabled={!selectedSymbol}
+			>
+				{#if !selectedTimeframe}
+					<option value="" disabled>Select TF</option>
+				{/if}
+				{#each availableTimeframes as tf}
+					<option value={tf}>{tf}</option>
+				{/each}
+			</select>
+		{:else}
+			<select class="toolbar-select" disabled>
+				<option>No TF</option>
+			</select>
+		{/if}
 	</div>
 
 	<div class="toolbar-section">
@@ -289,6 +362,12 @@
 		color: var(--text-primary);
 		font-size: 12px;
 		cursor: pointer;
+		min-width: 80px;
+	}
+
+	.toolbar-select:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	.toolbar-btn-with-label {
