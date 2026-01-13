@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { modalStore } from "../../../stores/modalStore";
 	import UploadTab from "../modals/newChart/UploadTab.svelte";
+	import YFinanceTab from "../modals/newChart/YFinanceTab.svelte";
+	import GitHubTab from "../modals/newChart/GitHubTab.svelte";
 
 	type TabType = "upload" | "yfinance" | "github";
 
@@ -79,43 +81,7 @@
 		{#if activeTab === "upload"}
 			<UploadTab />
 		{:else if activeTab === "yfinance"}
-			<div class="tab-panel">
-				<form class="yfinance-form">
-					<div class="form-group">
-						<label for="symbol">Symbol</label>
-						<input
-							type="text"
-							id="symbol"
-							placeholder="e.g., AAPL, MSFT, TSLA"
-							class="input"
-						/>
-					</div>
-
-					<div class="form-row">
-						<div class="form-group">
-							<label for="start-date">Start Date</label>
-							<input type="date" id="start-date" class="input" />
-						</div>
-						<div class="form-group">
-							<label for="end-date">End Date</label>
-							<input type="date" id="end-date" class="input" />
-						</div>
-					</div>
-
-					<div class="form-group">
-						<label for="interval">Interval</label>
-						<select id="interval" class="input">
-							<option value="1d">1 Day</option>
-							<option value="1h">1 Hour</option>
-							<option value="15m">15 Minutes</option>
-							<option value="5m">5 Minutes</option>
-							<option value="1m">1 Minute</option>
-						</select>
-					</div>
-
-					<button type="submit" class="submit-btn">Fetch Data</button>
-				</form>
-			</div>
+			<YFinanceTab />
 		{:else if activeTab === "github"}
 			<div class="tab-panel">
 				<form class="github-form">

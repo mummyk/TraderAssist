@@ -1,10 +1,10 @@
-mod commands;
-use tauri_plugin_sql::{Migration, MigrationKind};
+mod upload_function;
 
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+use tauri_plugin_sql::{Migration, MigrationKind};
+use upload_function::{
+    delete_symbol, fetch_github_data_command, fetch_yfinance_data_command, get_available_symbols,
+    get_symbol_data, process_chart_folder, rename_symbol,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -27,12 +27,16 @@ pub fn run() {
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
-            commands::process_chart_folder,
-            commands::get_available_symbols,
-            commands::get_symbol_data,
-            commands::delete_symbol,
-            commands::rename_symbol,
-            greet,
+            // Local folder commands
+            process_chart_folder,
+            get_available_symbols,
+            get_symbol_data,
+            delete_symbol,
+            rename_symbol,
+            // yFinance commands
+            fetch_yfinance_data_command,
+            // GitHub commands
+            fetch_github_data_command,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
